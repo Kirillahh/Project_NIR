@@ -76,59 +76,64 @@ SurveyApp решает проблему существующих сервисо�
 ## Схема базы данных
 
 ```mermaid
-Table users {
-  id int [pk]
-  email varchar
-  password_hash varchar
-  created_at timestamp
-}
+```mermaid
+erDiagram
+    USERS ||--o{ SURVEYS : creates
+    SURVEYS ||--o{ QUESTIONS : contains
+    QUESTIONS ||--o{ OPTIONS : has
+    SURVEYS ||--o{ SUBMISSIONS : receives
+    SUBMISSIONS ||--o{ ANSWERS : includes
+    QUESTIONS ||--o{ ANSWERS : answered_in
+    ANSWERS ||--o{ ANSWER_OPTIONS : selects
+    OPTIONS ||--o{ ANSWER_OPTIONS : chosen_in
 
-Table surveys {
-  id int [pk]
-  owner_id int [ref: > users.id]
-  title varchar
-  description text
-  is_test boolean
-  created_at timestamp
-}
-
-Table questions {
-  id int [pk]
-  survey_id int [ref: > surveys.id]
-  text text
-  type varchar
-  weight int
-  position int
-}
-
-Table options {
-  id int [pk]
-  question_id int [ref: > questions.id]
-  text text
-  is_correct boolean
-  position int
-}
-
-Table submissions {
-  id int [pk]
-  survey_id int [ref: > surveys.id]
-  respondent_name varchar
-  score int
-  max_score int
-  submitted_at timestamp
-}
-
-Table answers {
-  id int [pk]
-  submission_id int [ref: > submissions.id]
-  question_id int [ref: > questions.id]
-  text_answer text
-  points int
-}
-
-Table answer_options {
-  answer_id int [pk, ref: > answers.id]
-  option_id int [pk, ref: > options.id]
-}
+    USERS {
+        int id PK
+        string email
+        string password_hash
+        datetime created_at
+    }
+    SURVEYS {
+        int id PK
+        int owner_id FK
+        string title
+        string description
+        bool is_test
+        datetime created_at
+    }
+    QUESTIONS {
+        int id PK
+        int survey_id FK
+        string text
+        string type
+        int weight
+        int position
+    }
+    OPTIONS {
+        int id PK
+        int question_id FK
+        string text
+        bool is_correct
+        int position
+    }
+    SUBMISSIONS {
+        int id PK
+        int survey_id FK
+        string respondent_name
+        int score
+        int max_score
+        datetime submitted_at
+    }
+    ANSWERS {
+        int id PK
+        int submission_id FK
+        int question_id FK
+        string text_answer
+        int points
+    }
+    ANSWER_OPTIONS {
+        int answer_id FK
+        int option_id FK
+    }
 ```
 
