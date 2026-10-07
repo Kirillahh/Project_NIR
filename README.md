@@ -74,6 +74,8 @@ SurveyApp решает проблему существующих сервисо�
 | GET | /surveys/{id}/stats | статистика по вопросам |
 
 ## Схема базы данных
+
+```mermaid
 Table users {
   id int [pk]
   email varchar
@@ -128,5 +130,5 @@ Table answer_options {
   answer_id int [pk, ref: > answers.id]
   option_id int [pk, ref: > options.id]
 }
-
+```
 
