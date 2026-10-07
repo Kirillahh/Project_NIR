@@ -1,0 +1,60 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE surveys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    is_test INTEGER NOT NULL DEFAULT 0,
+    is_published INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    survey_id INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    type TEXT NOT NULL,
+    weight REAL NOT NULL DEFAULT 1,
+    is_required INTEGER NOT NULL DEFAULT 0,
+    correct_text TEXT,
+    position INTEGER NOT NULL
+);
+
+CREATE TABLE options (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    is_correct INTEGER NOT NULL DEFAULT 0,
+    position INTEGER NOT NULL
+);
+
+CREATE TABLE submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    survey_id INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    respondent_name TEXT,
+    score REAL NOT NULL DEFAULT 0,
+    max_score REAL NOT NULL DEFAULT 0,
+    submitted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    submission_id INTEGER NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    text_answer TEXT,
+    points REAL NOT NULL DEFAULT 0
+);
+
+CREATE TABLE answer_options (
+    answer_id INTEGER NOT NULL REFERENCES answers(id) ON DELETE CASCADE,
+    option_id INTEGER NOT NULL REFERENCES options(id) ON DELETE CASCADE,
+    PRIMARY KEY (answer_id, option_id)
+);
