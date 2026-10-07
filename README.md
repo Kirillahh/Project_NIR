@@ -72,3 +72,61 @@ SurveyApp решает проблему существующих сервисо�
 |-------|-------|------------|
 | GET | /surveys/{id}/submissions | список всех прохождений |
 | GET | /surveys/{id}/stats | статистика по вопросам |
+
+## Схема базы данных
+Table users {
+  id int [pk]
+  email varchar
+  password_hash varchar
+  created_at timestamp
+}
+
+Table surveys {
+  id int [pk]
+  owner_id int [ref: > users.id]
+  title varchar
+  description text
+  is_test boolean
+  created_at timestamp
+}
+
+Table questions {
+  id int [pk]
+  survey_id int [ref: > surveys.id]
+  text text
+  type varchar
+  weight int
+  position int
+}
+
+Table options {
+  id int [pk]
+  question_id int [ref: > questions.id]
+  text text
+  is_correct boolean
+  position int
+}
+
+Table submissions {
+  id int [pk]
+  survey_id int [ref: > surveys.id]
+  respondent_name varchar
+  score int
+  max_score int
+  submitted_at timestamp
+}
+
+Table answers {
+  id int [pk]
+  submission_id int [ref: > submissions.id]
+  question_id int [ref: > questions.id]
+  text_answer text
+  points int
+}
+
+Table answer_options {
+  answer_id int [pk, ref: > answers.id]
+  option_id int [pk, ref: > options.id]
+}
+
+
