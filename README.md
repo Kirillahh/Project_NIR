@@ -76,7 +76,6 @@ SurveyApp решает проблему существующих сервисо�
 ## Схема базы данных
 
 ```mermaid
-```mermaid
 erDiagram
     USERS ||--o{ SURVEYS : creates
     SURVEYS ||--o{ QUESTIONS : contains
