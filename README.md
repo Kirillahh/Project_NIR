@@ -72,3 +72,70 @@ SurveyApp решает проблему существующих сервисо�
 |-------|-------|------------|
 | GET | /surveys/{id}/submissions | список всех прохождений |
 | GET | /surveys/{id}/stats | статистика по вопросам |
+
+## Схема базы данных
+
+```mermaid
+erDiagram
+    USERS ||--o{ SURVEYS : creates
+    SURVEYS ||--o{ QUESTIONS : contains
+    QUESTIONS ||--o{ OPTIONS : has
+    SURVEYS ||--o{ SUBMISSIONS : receives
+    SUBMISSIONS ||--o{ ANSWERS : includes
+    QUESTIONS ||--o{ ANSWERS : answered_in
+    ANSWERS ||--o{ ANSWER_OPTIONS : selects
+    OPTIONS ||--o{ ANSWER_OPTIONS : chosen_in
+
+    USERS {
+        int id PK
+        string email UK
+        string password_hash
+        datetime created_at
+    }
+    SURVEYS {
+        int id PK
+        int owner_id FK
+        string title
+        string description
+        bool is_test
+        bool is_published
+        datetime created_at
+    }
+    QUESTIONS {
+        int id PK
+        int survey_id FK
+        string text
+        string type
+        float weight
+        bool is_required
+        string correct_text
+        int position
+    }
+    OPTIONS {
+        int id PK
+        int question_id FK
+        string text
+        bool is_correct
+        int position
+    }
+    SUBMISSIONS {
+        int id PK
+        int survey_id FK
+        string respondent_name
+        float score
+        float max_score
+        datetime submitted_at
+    }
+    ANSWERS {
+        int id PK
+        int submission_id FK
+        int question_id FK
+        string text_answer
+        float points
+    }
+    ANSWER_OPTIONS {
+        int answer_id FK
+        int option_id FK
+    }
+```
+
