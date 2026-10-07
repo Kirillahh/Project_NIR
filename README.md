@@ -88,7 +88,7 @@ erDiagram
 
     USERS {
         int id PK
-        string email
+        string email UK
         string password_hash
         datetime created_at
     }
@@ -98,6 +98,7 @@ erDiagram
         string title
         string description
         bool is_test
+        bool is_published
         datetime created_at
     }
     QUESTIONS {
@@ -105,7 +106,9 @@ erDiagram
         int survey_id FK
         string text
         string type
-        int weight
+        float weight
+        bool is_required
+        string correct_text
         int position
     }
     OPTIONS {
@@ -119,8 +122,8 @@ erDiagram
         int id PK
         int survey_id FK
         string respondent_name
-        int score
-        int max_score
+        float score
+        float max_score
         datetime submitted_at
     }
     ANSWERS {
@@ -128,7 +131,7 @@ erDiagram
         int submission_id FK
         int question_id FK
         string text_answer
-        int points
+        float points
     }
     ANSWER_OPTIONS {
         int answer_id FK
