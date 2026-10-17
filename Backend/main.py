@@ -5,8 +5,11 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from database import get_db
+from pwdlib import PasswordHash
 
 app = FastAPI(title="Survey App")
+
+password_hasher = PasswordHash.recommended()
 
 TEMP_OWNER_ID = 1  # временно, пока нет авторизации
 
@@ -87,3 +90,15 @@ def delete_question(question_id: int, db: Session = Depends(get_db)):
     db.delete(question)
     db.commit()
     return {"deleted": question_id}
+
+@app.post("/auth/register", response_model=schemas.UserOut, status_code=201)
+def register(data: schemas.UserCreate, db: Session = Depends(get_db)):
+    email = data.email.lower()
+    existing = db.scalar(select(models.User).where(models.User.email == email))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Пользователь с такой почтой уже есть")
+    user = models.User(email=email, password_hash=password_hasher.hash(data.password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
