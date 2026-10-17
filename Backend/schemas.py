@@ -1,12 +1,77 @@
 from datetime import datetime
+from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
+
+
+# ---------- то, что присылает клиент ----------
+
+class OptionCreate(BaseModel):
+    text: str
+    is_correct: bool = False
+
+
+class QuestionCreate(BaseModel):
+    text: str
+    type: Literal["single", "multiple", "text"]
+    weight: float = 1.0
+    is_required: bool = False
+    correct_text: Optional[str] = None
+    options: list[OptionCreate] = []
 
 
 class SurveyCreate(BaseModel):
     title: str
     description: str = ""
     is_test: bool = False
+    questions: list[QuestionCreate] = []
+
+    @model_validator(mode="after")
+    def check_questions(self):
+        for q in self.questions:
+            if q.type == "text":
+                if q.options:
+                    raise ValueError(f"У текстового вопроса «{q.text}» не должно быть вариантов")
+            else:
+                if len(q.options) < 2:
+                    raise ValueError(f"В вопросе «{q.text}» нужно минимум 2 варианта")
+                if self.is_test:
+                    correct = sum(o.is_correct for o in q.options)
+                    if q.type == "single" and correct != 1:
+                        raise ValueError(f"В вопросе «{q.text}» должен быть ровно один правильный вариант")
+                    if q.type == "multiple" and correct < 1:
+                        raise ValueError(f"В вопросе «{q.text}» нужен хотя бы один правильный вариант")
+        return self
+
+
+class SurveyUpdate(BaseModel):
+    title: str
+    description: str = ""
+    is_test: bool = False
+
+
+# ---------- то, что отвечает сервер ----------
+
+class OptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    text: str
+    is_correct: bool
+    position: int
+
+
+class QuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    text: str
+    type: str
+    weight: float
+    is_required: bool
+    correct_text: Optional[str]
+    position: int
+    options: list[OptionOut]
 
 
 class SurveyOut(BaseModel):
@@ -18,3 +83,7 @@ class SurveyOut(BaseModel):
     is_test: bool
     is_published: bool
     created_at: datetime
+
+
+class SurveyDetailOut(SurveyOut):
+    questions: list[QuestionOut]
