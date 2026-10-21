@@ -99,3 +99,8 @@ class UserOut(BaseModel):
     id: int
     email: str
     created_at: datetime
+    
+class TokenOut(BaseModel):
+    access_token:str
+    token_type: str
+
