@@ -158,4 +158,41 @@ class SubmissionResultOut(BaseModel):
     score: float
     max_score: float
     answers: list[AnswerResultOut]
+    
+class SubmissionListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    respondent_name: Optional[str]
+    score: float
+    max_score: float
+    submitted_at: datetime
+
+
+class OptionStat(BaseModel):
+    option_id: int
+    text: str
+    is_correct: bool
+    count: int
+    percent: float
+
+
+class QuestionStat(BaseModel):
+    question_id: int
+    text: str
+    type: str
+    answered: int
+    avg_points: float
+    options: list[OptionStat]
+    text_answers: list[str]
+
+
+class SurveyStats(BaseModel):
+    survey_id: int
+    is_test: bool
+    submissions_count: int
+    avg_score: float
+    max_score: float
+    avg_percent: float
+    questions: list[QuestionStat]   
 

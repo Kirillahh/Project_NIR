@@ -1,8 +1,9 @@
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from pwdlib.exceptions import UnknownHashError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from fastapi.middleware.cors import CORSMiddleware
 
 import grading
 import models
@@ -11,6 +12,13 @@ from database import get_db
 from security import create_access_token, get_current_user, password_hasher
 
 app = FastAPI(title="Survey App")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:5500", "http://localhost:5500"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def get_own_survey(db: Session, survey_id: int, user: models.User) -> models.Survey:
@@ -242,4 +250,109 @@ def submit_answers(survey_id: int, data: schemas.SubmissionCreate, db: Session =
         score=submission.score,
         max_score=submission.max_score,
         answers=results,
+    )
+#результаты (для автора) 
+
+@app.get("/surveys/{survey_id}/submissions", response_model=list[schemas.SubmissionListItem])
+def list_submissions(
+    survey_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    survey = get_own_survey(db, survey_id, user)
+    query = (
+        select(models.Submission)
+        .where(models.Submission.survey_id == survey.id)
+        .order_by(models.Submission.id.desc())
+    )
+    return db.scalars(query).all()
+
+
+@app.get("/surveys/{survey_id}/stats", response_model=schemas.SurveyStats)
+def survey_stats(
+    survey_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    survey = get_own_survey(db, survey_id, user)
+
+    count = db.scalar(
+        select(func.count(models.Submission.id)).where(models.Submission.survey_id == survey.id)
+    )
+    avg_score = db.scalar(
+        select(func.avg(models.Submission.score)).where(models.Submission.survey_id == survey.id)
+    )
+    max_score = sum(q.weight for q in survey.questions) if survey.is_test else 0.0
+
+    question_ids = [q.id for q in survey.questions]
+    option_ids = [o.id for q in survey.questions for o in q.options]
+
+    answered = {}
+    if question_ids:
+        rows = db.execute(
+            select(
+                models.Answer.question_id,
+                func.count(models.Answer.id),
+                func.sum(models.Answer.points),
+            )
+            .where(models.Answer.question_id.in_(question_ids))
+            .group_by(models.Answer.question_id)
+        ).all()
+        answered = {qid: (cnt, total) for qid, cnt, total in rows}
+
+    chosen = {}
+    if option_ids:
+        rows = db.execute(
+            select(models.answer_options.c.option_id, func.count())
+            .where(models.answer_options.c.option_id.in_(option_ids))
+            .group_by(models.answer_options.c.option_id)
+        ).all()
+        chosen = {oid: cnt for oid, cnt in rows}
+
+    def percent(part, whole):
+        return round(part / whole * 100, 1) if whole else 0.0
+
+    questions_out = []
+    for q in survey.questions:
+        answered_count, points_sum = answered.get(q.id, (0, 0))
+        options_out = [
+            schemas.OptionStat(
+                option_id=o.id,
+                text=o.text,
+                is_correct=o.is_correct,
+                count=chosen.get(o.id, 0),
+                percent=percent(chosen.get(o.id, 0), count),
+            )
+            for o in q.options
+        ]
+        text_answers = []
+        if q.type == "text":
+            text_answers = list(
+                db.scalars(
+                    select(models.Answer.text_answer)
+                    .where(models.Answer.question_id == q.id, models.Answer.text_answer.is_not(None))
+                    .order_by(models.Answer.id.desc())
+                    .limit(50)
+                ).all()
+            )
+        questions_out.append(
+            schemas.QuestionStat(
+                question_id=q.id,
+                text=q.text,
+                type=q.type,
+                answered=answered_count,
+                avg_points=round(points_sum / count, 2) if count and survey.is_test else 0.0,
+                options=options_out,
+                text_answers=text_answers,
+            )
+        )
+
+    return schemas.SurveyStats(
+        survey_id=survey.id,
+        is_test=survey.is_test,
+        submissions_count=count,
+        avg_score=round(avg_score, 2) if avg_score is not None else 0.0,
+        max_score=max_score,
+        avg_percent=percent(avg_score, max_score) if avg_score is not None and max_score else 0.0,
+        questions=questions_out,
     )
