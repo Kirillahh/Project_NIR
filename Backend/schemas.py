@@ -4,7 +4,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
-# ---------- то, что присылает клиент ----------
+#то, что присылает клиент
 
 class OptionCreate(BaseModel):
     text: str
@@ -48,9 +48,10 @@ class SurveyUpdate(BaseModel):
     title: str
     description: str = ""
     is_test: bool = False
+    is_published: bool = False
 
 
-# ---------- то, что отвечает сервер ----------
+#то, что отвечает сервер
 
 class OptionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -103,4 +104,58 @@ class UserOut(BaseModel):
 class TokenOut(BaseModel):
     access_token:str
     token_type: str
+
+class PublicOptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    text: str
+    position: int
+
+
+class PublicQuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    text: str
+    type: str
+    weight: float
+    is_required: bool
+    position: int
+    options: list[PublicOptionOut]
+
+
+class PublicSurveyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    description: str
+    is_test: bool
+    questions: list[PublicQuestionOut]
+
+
+class AnswerIn(BaseModel):
+    question_id: int
+    selected_option_ids: list[int] = []
+    text: Optional[str] = Field(default=None, max_length=2000)
+
+
+class SubmissionCreate(BaseModel):
+    respondent_name: Optional[str] = Field(default=None, max_length=100)
+    answers: list[AnswerIn] = []
+
+
+class AnswerResultOut(BaseModel):
+    question_id: int
+    points: float
+    max_points: float
+
+
+class SubmissionResultOut(BaseModel):
+    submission_id: int
+    is_test: bool
+    score: float
+    max_score: float
+    answers: list[AnswerResultOut]
 

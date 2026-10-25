@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, func
+from sqlalchemy import Column, ForeignKey, Table, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -64,3 +64,39 @@ class Option(Base):
     position: Mapped[int]
 
     question: Mapped["Question"] = relationship(back_populates="options")
+    
+answer_options = Table(
+    "answer_options",
+    Base.metadata,
+    Column("answer_id", ForeignKey("answers.id", ondelete="CASCADE"), primary_key=True),
+    Column("option_id", ForeignKey("options.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Submission(Base):
+    __tablename__ = "submissions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    survey_id: Mapped[int] = mapped_column(ForeignKey("surveys.id", ondelete="CASCADE"))
+    respondent_name: Mapped[Optional[str]]
+    score: Mapped[float] = mapped_column(default=0.0)
+    max_score: Mapped[float] = mapped_column(default=0.0)
+    submitted_at: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+
+    answers: Mapped[list["Answer"]] = relationship(
+        back_populates="submission",
+        cascade="all, delete-orphan",
+    )
+
+
+class Answer(Base):
+    __tablename__ = "answers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    submission_id: Mapped[int] = mapped_column(ForeignKey("submissions.id", ondelete="CASCADE"))
+    question_id: Mapped[int] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"))
+    text_answer: Mapped[Optional[str]]
+    points: Mapped[float] = mapped_column(default=0.0)
+
+    submission: Mapped["Submission"] = relationship(back_populates="answers")
+    selected_options: Mapped[list["Option"]] = relationship(secondary=answer_options)

@@ -4,6 +4,7 @@ from pwdlib.exceptions import UnknownHashError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import grading
 import models
 import schemas
 from database import get_db
@@ -126,6 +127,7 @@ def update_survey(
     survey.title = data.title
     survey.description = data.description
     survey.is_test = data.is_test
+    survey.is_published = data.is_published
     db.commit()
     db.refresh(survey)
     return survey
@@ -157,3 +159,87 @@ def delete_question(
     db.delete(question)
     db.commit()
     return {"deleted": question_id}
+
+#прохождение (публичное)
+
+def load_published_survey(db: Session, survey_id: int) -> models.Survey:
+    survey = db.get(models.Survey, survey_id)
+    if survey is None or not survey.is_published:
+        raise HTTPException(status_code=404, detail="Опрос не найден")
+    return survey
+
+
+@app.get("/public/surveys/{survey_id}", response_model=schemas.PublicSurveyOut)
+def get_public_survey(survey_id: int, db: Session = Depends(get_db)):
+    return load_published_survey(db, survey_id)
+
+
+@app.post(
+    "/public/surveys/{survey_id}/submissions",
+    response_model=schemas.SubmissionResultOut,
+    status_code=201,
+)
+def submit_answers(survey_id: int, data: schemas.SubmissionCreate, db: Session = Depends(get_db)):
+    survey = load_published_survey(db, survey_id)
+    questions = {q.id: q for q in survey.questions}
+
+    given = {}
+    for a in data.answers:
+        if a.question_id not in questions:
+            raise HTTPException(status_code=422, detail=f"Вопрос {a.question_id} не относится к этому опросу")
+        if a.question_id in given:
+            raise HTTPException(status_code=422, detail=f"На вопрос {a.question_id} ответ отправлен дважды")
+        given[a.question_id] = a
+
+    submission = models.Submission(survey_id=survey.id, respondent_name=data.respondent_name)
+    results = []
+    total = 0.0
+    max_total = 0.0
+
+    for q in survey.questions:
+        a = given.get(q.id)
+        text = (a.text or "").strip() if a else ""
+        selected_ids = set(a.selected_option_ids) if a else set()
+        if q.type == "text":
+            selected_ids = set()
+        max_points = q.weight if survey.is_test else 0.0
+        max_total += max_points
+        answered = bool(text) if q.type == "text" else bool(selected_ids)
+
+        if not answered:
+            if q.is_required:
+                raise HTTPException(status_code=422, detail=f"Нужно ответить на вопрос «{q.text}»")
+            results.append(schemas.AnswerResultOut(question_id=q.id, points=0.0, max_points=max_points))
+            continue
+
+        if q.type != "text":
+            valid_ids = {o.id for o in q.options}
+            if not selected_ids <= valid_ids:
+                raise HTTPException(status_code=422, detail=f"В вопросе «{q.text}» выбран неизвестный вариант")
+            if q.type == "single" and len(selected_ids) > 1:
+                raise HTTPException(status_code=422, detail=f"В вопросе «{q.text}» можно выбрать только один вариант")
+
+        points = grading.grade_answer(q, selected_ids, text) if survey.is_test else 0.0
+        answer = models.Answer(
+            question_id=q.id,
+            text_answer=text if q.type == "text" else None,
+            points=points,
+        )
+        answer.selected_options = [o for o in q.options if o.id in selected_ids]
+        submission.answers.append(answer)
+        total += points
+        results.append(schemas.AnswerResultOut(question_id=q.id, points=points, max_points=max_points))
+
+    submission.score = round(total, 2)
+    submission.max_score = max_total
+    db.add(submission)
+    db.commit()
+    db.refresh(submission)
+
+    return schemas.SubmissionResultOut(
+        submission_id=submission.id,
+        is_test=survey.is_test,
+        score=submission.score,
+        max_score=submission.max_score,
+        answers=results,
+    )
